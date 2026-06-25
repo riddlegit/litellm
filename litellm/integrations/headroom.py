@@ -74,37 +74,55 @@ class HeadroomLogger(CustomLogger):
             return data
         model = data.get("model", "") or ""
 
-        token_count = litellm.token_counter(model=model, messages=messages)
-        if token_count < self.min_tokens:
-            return data
+        try:
+            token_count = litellm.token_counter(model=model, messages=messages)
+            if token_count < self.min_tokens:
+                return data
 
-        compress_fn = self._load_compress()
-        if compress_fn is None:
-            return data
+            compress_fn = self._load_compress()
+            if compress_fn is None:
+                return data
 
-        result = compress_fn(
-            messages=messages,
-            model=model or _DEFAULT_MODEL,
-            model_limit=self.model_limit,
-            hooks=self.hooks,
-        )
+            result = compress_fn(
+                messages=messages,
+                model=model or _DEFAULT_MODEL,
+                model_limit=self.model_limit,
+                hooks=self.hooks,
+            )
 
-        if result is not None and getattr(result, "tokens_saved", 0) > 0:
-            data["messages"] = result.messages
-            self.total_tokens_saved += result.tokens_saved
-            verbose_logger.info(
-                "Headroom: %s->%s tokens (saved %s) [total saved: %s]",
-                getattr(result, "tokens_before", "?"),
-                getattr(result, "tokens_after", "?"),
-                result.tokens_saved,
-                self.total_tokens_saved,
+            if result is not None and getattr(result, "tokens_saved", 0) > 0:
+                data["messages"] = result.messages
+                self.total_tokens_saved += result.tokens_saved
+                verbose_logger.info(
+                    "Headroom: %s->%s tokens (saved %s) [total saved: %s]",
+                    getattr(result, "tokens_before", "?"),
+                    getattr(result, "tokens_after", "?"),
+                    result.tokens_saved,
+                    self.total_tokens_saved,
+                )
+        except Exception as e:
+            verbose_logger.warning(
+                "Headroom compression failed, using original messages: %s", e
             )
 
         return data
 
     def _load_compress(self) -> Optional[Any]:
+        """Lazily import ``headroom.compress.compress``. Returns None (and caches
+        the failure) if ``headroom-ai`` is not installed."""
+        if self._import_failed:
+            return None
         if self._compress_fn is None:
-            from headroom.compress import compress
+            try:
+                from headroom.compress import compress
 
-            self._compress_fn = compress
+                self._compress_fn = compress
+            except Exception as e:
+                self._import_failed = True
+                verbose_logger.error(
+                    "Headroom requires the `headroom-ai` package "
+                    "(pip install headroom-ai). Skipping compression: %s",
+                    e,
+                )
+                return None
         return self._compress_fn

@@ -1,4 +1,5 @@
 import asyncio
+import builtins
 import sys
 import types
 from types import SimpleNamespace
@@ -168,3 +169,89 @@ def test_hook_skips_below_min_tokens(monkeypatch):
 
     assert not compress_mock.called
     assert result is data
+
+
+# ---------------- failure safety ----------------
+
+
+def _block_headroom_import(monkeypatch):
+    """Make `import headroom...` deterministically fail even if headroom-ai is installed.
+    Returns a list whose [0] is the number of import attempts observed."""
+    calls = [0]
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "headroom" or name.startswith("headroom."):
+            calls[0] += 1
+            raise ImportError("simulated: headroom-ai not installed")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.delitem(sys.modules, "headroom", raising=False)
+    monkeypatch.delitem(sys.modules, "headroom.compress", raising=False)
+    return calls
+
+
+def test_hook_falls_back_when_compress_raises(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    compress_mock = MagicMock(side_effect=RuntimeError("compress boom"))
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = _data()
+    original_messages = data["messages"]
+    result = _run_hook(logger, data)  # must NOT raise
+
+    assert result["messages"] == original_messages  # original messages preserved
+    assert logger.total_tokens_saved == 0
+
+
+def test_hook_falls_back_when_headroom_missing(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    _block_headroom_import(monkeypatch)
+
+    logger = HeadroomLogger()
+    data = _data()
+    original_messages = data["messages"]
+    result = _run_hook(logger, data)  # must NOT raise
+
+    assert result["messages"] == original_messages
+    assert logger.total_tokens_saved == 0
+    assert logger._import_failed is True
+
+
+def test_hook_does_not_retry_import_after_failure(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    import_calls = _block_headroom_import(monkeypatch)
+
+    logger = HeadroomLogger()
+    _run_hook(logger, _data())
+    calls_after_first = import_calls[0]
+    _run_hook(logger, _data())
+    _run_hook(logger, _data())
+
+    assert import_calls[0] == calls_after_first  # no additional import attempts
+
+
+# ---------------- no-op when compression saves nothing (coverage) ----------------
+
+
+def test_hook_no_replace_when_tokens_saved_zero(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    original_messages = [{"role": "user", "content": "hello world"}]
+    compress_mock = MagicMock(
+        return_value=_make_result(
+            messages=[{"role": "user", "content": "x"}], tokens_saved=0
+        )
+    )
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = _data(messages=original_messages)
+    result = _run_hook(logger, data)
+
+    assert compress_mock.called
+    assert (
+        result["messages"] == original_messages
+    )  # NOT replaced when tokens_saved == 0
+    assert logger.total_tokens_saved == 0
