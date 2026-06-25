@@ -2,6 +2,7 @@ import asyncio
 import sys
 import types
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import litellm
 from litellm.integrations.headroom import HeadroomLogger
@@ -87,3 +88,83 @@ def test_registry_resolves_headroom():
         CustomLoggerRegistry.get_callback_str_from_class_type(HeadroomLogger)
         == "headroom"
     )
+
+
+# ---------------- async_pre_call_hook: success + guards ----------------
+
+
+def _data(messages=None):
+    return {
+        "model": "gpt-4o",
+        "messages": (
+            messages
+            if messages is not None
+            else [{"role": "user", "content": "hello world"}]
+        ),
+    }
+
+
+def test_hook_compresses_and_replaces_messages(monkeypatch):
+    _set_token_count(monkeypatch, 1000)  # above default min_tokens (500)
+    compressed = [{"role": "user", "content": "compressed"}]
+    compress_mock = MagicMock(
+        return_value=_make_result(messages=compressed, tokens_saved=100)
+    )
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = _data()
+    result = _run_hook(logger, data)
+
+    assert compress_mock.called
+    assert result["messages"] == compressed
+    assert logger.total_tokens_saved == 100
+
+
+def test_hook_accumulates_tokens_saved(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    compress_mock = MagicMock(return_value=_make_result(tokens_saved=50))
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    _run_hook(logger, _data())
+    _run_hook(logger, _data())
+    assert logger.total_tokens_saved == 100
+
+
+def test_hook_skips_non_completion_call_type(monkeypatch):
+    compress_mock = MagicMock(return_value=_make_result())
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = _data()
+    result = _run_hook(logger, data, call_type="embeddings")
+
+    assert not compress_mock.called
+    assert result is data  # unchanged, same object
+
+
+def test_hook_skips_empty_messages(monkeypatch):
+    _set_token_count(monkeypatch, 1000)
+    compress_mock = MagicMock(return_value=_make_result())
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = {"model": "gpt-4o", "messages": []}
+    result = _run_hook(logger, data)
+
+    assert not compress_mock.called
+    assert result is data
+
+
+def test_hook_skips_below_min_tokens(monkeypatch):
+    _set_token_count(monkeypatch, 10)  # below default min_tokens (500)
+    compress_mock = MagicMock(return_value=_make_result())
+    _install_fake_compress(monkeypatch, compress_mock)
+
+    logger = HeadroomLogger()
+    data = _data()
+    result = _run_hook(logger, data)
+
+    assert not compress_mock.called
+    assert result is data
