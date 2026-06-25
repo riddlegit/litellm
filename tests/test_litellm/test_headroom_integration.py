@@ -1,11 +1,7 @@
 import asyncio
-import builtins
 import sys
 import types
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-
-import pytest
 
 import litellm
 from litellm.integrations.headroom import HeadroomLogger
@@ -13,11 +9,14 @@ from litellm.integrations.headroom import HeadroomLogger
 
 # ---------------- helpers ----------------
 
+
 def _make_result(messages=None, tokens_saved=100, before=1000, after=900):
     return SimpleNamespace(
-        messages=messages
-        if messages is not None
-        else [{"role": "user", "content": "compressed"}],
+        messages=(
+            messages
+            if messages is not None
+            else [{"role": "user", "content": "compressed"}]
+        ),
         tokens_before=before,
         tokens_after=after,
         tokens_saved=tokens_saved,
@@ -48,6 +47,7 @@ def _run_hook(logger, data, call_type="completion"):
 
 
 # ---------------- __init__ config ----------------
+
 
 def test_init_defaults():
     logger = HeadroomLogger()

@@ -16,8 +16,6 @@ Requires the optional `headroom-ai` package: pip install headroom-ai
 import os
 from typing import Any, Optional
 
-import litellm
-from litellm._logging import verbose_logger
 from litellm.integrations.custom_logger import CustomLogger
 
 _DEFAULT_MIN_TOKENS = 500
