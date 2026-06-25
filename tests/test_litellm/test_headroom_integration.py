@@ -71,3 +71,19 @@ def test_init_explicit_args_override_env(monkeypatch):
     logger = HeadroomLogger(min_tokens=42, model_limit=8)
     assert logger.min_tokens == 42
     assert logger.model_limit == 8
+
+
+# ---------------- registry short-name resolution ----------------
+
+
+def test_registry_resolves_headroom():
+    from litellm.litellm_core_utils.custom_logger_registry import CustomLoggerRegistry
+
+    assert (
+        CustomLoggerRegistry.get_class_type_for_custom_logger_name("headroom")
+        is HeadroomLogger
+    )
+    assert (
+        CustomLoggerRegistry.get_callback_str_from_class_type(HeadroomLogger)
+        == "headroom"
+    )
