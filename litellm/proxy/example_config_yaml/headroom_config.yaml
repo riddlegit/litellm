@@ -1,0 +1,15 @@
+model_list:
+  - model_name: gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+litellm_settings:
+  # Enable Headroom message compression (remove this line to disable).
+  callbacks: ["headroom"]
+
+# Headroom tuning (environment variables):
+#   HEADROOM_MIN_TOKENS=500      # skip compression for requests below this token count
+#   HEADROOM_MODEL_LIMIT=200000  # model context limit passed to Headroom
+#
+# Requires the optional package: pip install headroom-ai

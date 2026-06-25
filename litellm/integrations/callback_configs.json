@@ -454,5 +454,26 @@
       }
     },
     "description": "SQS Queue (AWS) Logging Integration"
+  },
+  {
+    "id": "headroom",
+    "displayName": "Headroom",
+    "logo": "headroom.png",
+    "supports_key_team_logging": false,
+    "dynamic_params": {
+      "headroom_min_tokens": {
+        "type": "number",
+        "ui_name": "Min Tokens",
+        "description": "Skip compression for requests below this token count (default 500)",
+        "required": false
+      },
+      "headroom_model_limit": {
+        "type": "number",
+        "ui_name": "Model Token Limit",
+        "description": "Model context limit passed to Headroom (default 200000)",
+        "required": false
+      }
+    },
+    "description": "Headroom message compression integration (local mode). Requires pip install headroom-ai"
   }
 ]
