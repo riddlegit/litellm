@@ -26,6 +26,25 @@ _DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
 _COMPRESSION_CALL_TYPES = ("completion", "acompletion")
 
 
+def _get_int_env(name: str, default: int) -> int:
+    """Read an integer env var. Falls back to ``default`` (with a warning) if the
+    variable is unset, empty, or non-numeric — so a malformed value never breaks
+    callback initialization."""
+    raw = os.getenv(name)
+    if raw is None or raw.strip() == "":
+        return default
+    try:
+        return int(raw)
+    except (ValueError, TypeError):
+        verbose_logger.warning(
+            "Headroom: invalid integer for %s=%r; using default %d",
+            name,
+            raw,
+            default,
+        )
+        return default
+
+
 class HeadroomLogger(CustomLogger):
     """LiteLLM proxy callback that compresses messages via Headroom before each
     completion call.
@@ -46,12 +65,12 @@ class HeadroomLogger(CustomLogger):
         self.min_tokens = (
             min_tokens
             if min_tokens is not None
-            else int(os.getenv("HEADROOM_MIN_TOKENS", str(_DEFAULT_MIN_TOKENS)))
+            else _get_int_env("HEADROOM_MIN_TOKENS", _DEFAULT_MIN_TOKENS)
         )
         self.model_limit = (
             model_limit
             if model_limit is not None
-            else int(os.getenv("HEADROOM_MODEL_LIMIT", str(_DEFAULT_MODEL_LIMIT)))
+            else _get_int_env("HEADROOM_MODEL_LIMIT", _DEFAULT_MODEL_LIMIT)
         )
         self.hooks = hooks
         self.total_tokens_saved = 0

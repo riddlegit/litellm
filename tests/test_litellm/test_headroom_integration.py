@@ -274,3 +274,23 @@ def test_string_callback_instantiates_to_logger():
 
     looked_up = get_custom_logger_compatible_class("headroom")
     assert isinstance(looked_up, HeadroomLogger)
+
+
+# ---------------- env var parsing robustness ----------------
+
+
+def test_init_empty_env_falls_back_to_default(monkeypatch):
+    monkeypatch.setenv("HEADROOM_MIN_TOKENS", "")
+    monkeypatch.setenv("HEADROOM_MODEL_LIMIT", "")
+    logger = HeadroomLogger()  # must NOT raise
+    assert logger.min_tokens == 500
+    assert logger.model_limit == 200000
+
+
+def test_init_invalid_env_falls_back_to_default(monkeypatch):
+    # "None" is what the proxy writes when YAML has `HEADROOM_MIN_TOKENS:` with no value
+    monkeypatch.setenv("HEADROOM_MIN_TOKENS", "None")
+    monkeypatch.setenv("HEADROOM_MODEL_LIMIT", "abc")
+    logger = HeadroomLogger()  # must NOT raise
+    assert logger.min_tokens == 500
+    assert logger.model_limit == 200000
