@@ -255,3 +255,22 @@ def test_hook_no_replace_when_tokens_saved_zero(monkeypatch):
         result["messages"] == original_messages
     )  # NOT replaced when tokens_saved == 0
     assert logger.total_tokens_saved == 0
+
+
+# ---------------- string-callback instantiation (the real enablement path) ----------------
+
+
+def test_string_callback_instantiates_to_logger():
+    """callbacks: ['headroom'] must instantiate a HeadroomLogger via the
+    hardcoded if/elif resolver (not just the registry). Regression for the bug
+    where the short name resolved to None and the feature was silently inert."""
+    from litellm.litellm_core_utils.litellm_logging import (
+        _init_custom_logger_compatible_class,
+        get_custom_logger_compatible_class,
+    )
+
+    inst = _init_custom_logger_compatible_class("headroom", None, None)
+    assert isinstance(inst, HeadroomLogger)
+
+    looked_up = get_custom_logger_compatible_class("headroom")
+    assert isinstance(looked_up, HeadroomLogger)
