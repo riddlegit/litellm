@@ -25,7 +25,7 @@ Headroom 有两种压缩模式：
 | # | 决策点 | 选择 |
 |---|---|---|
 | 1 | 压缩模式 | **仅 Local 模式**。进程内压缩，懒加载 `headroom.compress()`；不引入 Cloud / httpx / API key。需要用户另装 `headroom-ai`。 |
-| 2 | 开关机制 | **短名注册 + 环境变量**。在 callback registry 与 `__init__.py` Literal 注册短名 `"headroom"`；通过 `litellm_settings: callbacks: ["headroom"]` 开关；调参用环境变量 `HEADROOM_MIN_TOKENS` / `HEADROOM_MODEL_LIMIT`。 |
+| 2 | 开关机制 | **短名注册 + 环境变量**。需要**三处**注册才能让 `callbacks: ["headroom"]` 真正实例化 `HeadroomLogger`：(a) `__init__.py` 的 Literal、(b) `custom_logger_registry.py` 的 dict、(c) `litellm_logging.py` 的两个硬编码 if/elif 实例化链（`_init_custom_logger_compatible_class` 与 `get_custom_logger_compatible_class`）—— **(c) 是关键**，registry 只是反查、不参与实例化。通过 `litellm_settings: callbacks: ["headroom"]` 开关；调参用环境变量 `HEADROOM_MIN_TOKENS` / `HEADROOM_MODEL_LIMIT`。 |
 | 3 | 改动范围 | **完整集成**：新模块 + registry + Literal + `callback_configs.json` UI 元数据 + 示例 yaml + 单测。 |
 | 4 | `min_tokens` 行为 | **加 token 预过滤**。压缩前用 `litellm.token_counter` 估算消息 token 数，低于 `HEADROOM_MIN_TOKENS`（默认 500）的请求跳过压缩（让参数真正生效，优于上游存而不用）。 |
 | 5 | Hook 选择 | **`async_pre_call_hook`（proxy-only）**。见第 4 节。 |
@@ -164,6 +164,7 @@ class HeadroomLogger(CustomLogger):
 |---|---|---|
 | 新建 | `litellm/integrations/headroom.py` | `HeadroomLogger` 类 |
 | 改 | `litellm/litellm_core_utils/custom_logger_registry.py` | 顶部 import（`from litellm.integrations.headroom import HeadroomLogger`，按字母序插在 `gitlab` 与 `humanloop` 之间）；`CALLBACK_CLASS_STR_TO_CLASS_TYPE` 加 `"headroom": HeadroomLogger`（该 dict 非严格排序，插在 `"focus"` 附近即可） |
+| 改 | `litellm/litellm_core_utils/litellm_logging.py` | **实例化的关键**。在 `_init_custom_logger_compatible_class` 与 `get_custom_logger_compatible_class` 两个硬编码 if/elif 链里各加一个 `elif logging_integration == "headroom"` 分支（仿 `cloudzero`/`vantage`）。registry 不参与实例化，仅靠它 `callbacks:["headroom"]` 会静默解析为 `None` 而失效。 |
 | 改 | `litellm/__init__.py` | `_custom_logger_compatible_callbacks_literal` 加 `"headroom",`（该 Literal 非严格字母序；位置不影响功能，加在列表末尾 `compression_interception` 后即可） |
 | 改 | `litellm/integrations/callback_configs.json` | 加 headroom 条目（displayName / description / dynamic_params：`headroom_min_tokens`、`headroom_model_limit`）。主配置渠道仍是环境变量，dynamic_params 仅作 dashboard 提示。 |
 | 新建 | `litellm/proxy/example_config_yaml/headroom_config.yaml` | 示例配置 |
