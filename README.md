@@ -80,6 +80,8 @@ Managing LLM calls across providers gets complicated fast — different SDKs, au
 * Headroom integration, maybe official repo will integrate soon, so this is only for testing and fun
 * Local depoly as proxy
 * Personal test result, about 10% tokens saved
+* Developed with Claude Code + GLM 5.2, also used this branch as proxy in development
+* Install & run:
 ```shell
 pip install -e .
 pip install headroom-ai
