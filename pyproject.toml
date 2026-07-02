@@ -87,6 +87,7 @@ grpc = [
     "grpcio==1.78.0",
 ]
 google = ["google-cloud-aiplatform==1.133.0"]
+headroom = ["headroom-ai>=0.28.0"]
 proxy-runtime = [
     # Historically bundled in the proxy Docker images via requirements.txt.
     # Keep these in a dedicated extra so uv-based images preserve the same
