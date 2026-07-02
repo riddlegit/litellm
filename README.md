@@ -77,7 +77,7 @@ Managing LLM calls across providers gets complicated fast — different SDKs, au
 
 ---
 ## Fork from official repo
-* Headroom integration, maybe official repo will integrate soon, so this is for only for testing and fun
+* Headroom integration, maybe official repo will integrate soon, so this is only for testing and fun
 * Local depoly as proxy
 * Personal test result, about 10% tokens saved
 ```shell
