@@ -76,6 +76,15 @@ Managing LLM calls across providers gets complicated fast — different SDKs, au
 </table>
 
 ---
+## Fork from official repo
+* Headroom integration, maybe official repo will integrate soon, so this is for only for testing and fun
+* Local depoly as proxy
+* Personal test result, about 10% tokens saved
+```shell
+pip install -e .
+pip install headroom-ai
+litellm --port your-port -c your-config.yaml
+```
 
 ## Features
 
