@@ -13,6 +13,7 @@ Tune via environment variables:
 Requires the optional `headroom-ai` package: pip install headroom-ai
 """
 
+import logging
 import os
 from typing import Any, Optional
 
@@ -20,10 +21,23 @@ import litellm
 from litellm._logging import verbose_logger
 from litellm.integrations.custom_logger import CustomLogger
 
+logger = logging.getLogger("litellm.integrations.headroom")
+logger.setLevel(logging.DEBUG)
+if not logger.handlers:
+    _handler = logging.StreamHandler()
+    _handler.setLevel(logging.INFO)
+    logger.addHandler(_handler)
+    logger.propagate = False
+
 _DEFAULT_MIN_TOKENS = 500
 _DEFAULT_MODEL_LIMIT = 200000
 _DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
-_COMPRESSION_CALL_TYPES = ("completion", "acompletion")
+_COMPRESSION_CALL_TYPES = (
+    "completion",
+    "acompletion",
+    "anthropic_messages",
+    "aanthropic_messages",
+)
 
 
 def _get_int_env(name: str, default: int) -> int:
@@ -112,8 +126,8 @@ class HeadroomLogger(CustomLogger):
             if result is not None and getattr(result, "tokens_saved", 0) > 0:
                 data["messages"] = result.messages
                 self.total_tokens_saved += result.tokens_saved
-                verbose_logger.info(
-                    "Headroom: %s->%s tokens (saved %s) [total saved: %s]",
+                logger.info(
+                    "[Headroom] %s->%s tokens (saved %s) [total saved: %s]",
                     getattr(result, "tokens_before", "?"),
                     getattr(result, "tokens_after", "?"),
                     result.tokens_saved,
