@@ -78,16 +78,53 @@ Managing LLM calls across providers gets complicated fast — different SDKs, au
 ---
 
 ## Fork from official repo
-* Headroom integration, maybe official repo will integrate soon, so this is only for testing and fun
-* Local depoly as proxy
-* Personal test result, about 10% tokens saved
-* Developed with Claude Code + GLM 5.2, also used this branch as proxy in development
-* Install & run:
+
+### Headroom Integration (Callback / In-Process)
+
+This fork adds a lightweight Headroom integration via `litellm/integrations/headroom.py`, using the **CustomLogger callback** pattern (`async_pre_call_hook`).
+
+- Runs Headroom **in-process** — no sidecar service needed, just `pip install headroom-ai`
+- Compresses messages before each completion call; skips if below token threshold
+- Personal test result: ~10% tokens saved on typical workloads
+- Developed with Claude Code + GLM 5.2; also used this branch as proxy during development
+
+**Install & run:**
 ```shell
 pip install -e .
 pip install headroom-ai
 litellm --port your-port -c your-config.yaml
 ```
+
+**Config:**
+```yaml
+litellm_settings:
+  callbacks: ["headroom"]
+```
+
+Tune via env vars:
+- `HEADROOM_MIN_TOKENS` (default 500) — skip compression below this token count
+- `HEADROOM_MODEL_LIMIT` (default 200000) — model context limit passed to headroom
+
+### Comparison: This Fork vs Upstream's Guardrail Integration
+
+The upstream repo ([PR #31407](https://github.com/BerriAI/litellm/pull/31407), merged 2026-06-27) also integrates Headroom, but via the **guardrails** subsystem (`litellm/proxy/guardrails/guardrail_hooks/headroom/`). The two approaches target different deployment scenarios:
+
+| | **This fork (Integrations/Callback)** | **Upstream (Guardrails)** |
+|---|---|---|
+| Base class | `CustomLogger` | `CustomGuardrail` |
+| Hook | `async_pre_call_hook` | `apply_guardrail` + agentic loop |
+| Config | `litellm_settings.callbacks: ["headroom"]` | `guardrails:` YAML block with `guardrail: headroom` |
+| Deployment | **In-process** — direct Python import | **Sidecar** — Headroom runs as a separate HTTP service (`/v1/compress`, `/v1/retrieve`) |
+| Dependency | `pip install headroom-ai` (Python package) | Running Headroom Docker/service with network access |
+| CCR (Compress-Cache-Retrieve) | No — compress only | Yes — injects `headroom_retrieve` tool so the model can fetch original content on demand |
+| Hash validation | N/A | Per-request `litellm_call_id` scoped hash validation; rejects forged hashes |
+| Fail behavior | Silent fallback on any error | Configurable: `fail_open` (forward uncompressed) or `fail_closed` (502) |
+| Bypass mechanism | None | `x-headroom-bypass: true` header |
+| Audit logging | `verbose_logger` only | Full `guardrail_information` in spend logs |
+| API format support | OpenAI completions only | OpenAI, Anthropic Messages, and Responses API |
+| Best for | Lightweight local dev, single-machine setups | Production deployments, multi-team, needs audit & fine-grained control |
+
+**Bottom line:** The upstream guardrail implementation is production-grade with full CCR, security validation, and audit support — but requires a sidecar. This fork's callback approach is simpler and lighter for local development.
 
 ## Features
 
