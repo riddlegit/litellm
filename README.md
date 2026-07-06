@@ -121,7 +121,7 @@ The upstream repo ([PR #31407](https://github.com/BerriAI/litellm/pull/31407), m
 | Fail behavior | Silent fallback on any error | Configurable: `fail_open` (forward uncompressed) or `fail_closed` (502) |
 | Bypass mechanism | None | `x-headroom-bypass: true` header |
 | Audit logging | `verbose_logger` only | Full `guardrail_information` in spend logs |
-| API format support | OpenAI completions only | OpenAI, Anthropic Messages, and Responses API |
+| API format support | OpenAI completions + Anthropic Messages | OpenAI, Anthropic Messages, and Responses API |
 | Best for | Lightweight local dev, single-machine setups | Production deployments, multi-team, needs audit & fine-grained control |
 
 **Bottom line:** The upstream guardrail implementation is production-grade with full CCR, security validation, and audit support — but requires a sidecar. This fork's callback approach is simpler and lighter for local development.
